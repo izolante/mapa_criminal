@@ -1,0 +1,174 @@
+import React, { useEffect, useState } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, getDocs } from 'firebase/firestore';
+
+// Configuração do Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyDc-Znsm41WJVPPTou32s3bEVvlHzhQTUo",
+  authDomain: "tcc01-420505.firebaseapp.com",
+  projectId: "tcc01-420505",
+  storageBucket: "tcc01-420505.appspot.com",
+  messagingSenderId: "1086977661958",
+  appId: "1:1086977661958:web:5d99adf5ef2ff8da987787",
+  measurementId: "G-F9R0BGNMQL"
+};
+
+// Inicializar Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+function HeatmapApp() {
+  const [map, setMap] = useState(null);
+  const [heatmap, setHeatmap] = useState(null);
+  const [isPanelVisible, setIsPanelVisible] = useState(true);
+
+  useEffect(() => {
+    const handleError = (event) => {
+      event.preventDefault(); // Evita o comportamento padrão do evento de erro
+      console.error('Erro capturado:', event.error); // Loga o erro no console
+    };
+
+    window.onerror = function (message, source, lineno, colno, error) {
+      // Retorna `true` para indicar que o erro foi tratado
+      return true;
+    };
+
+    window.addEventListener('error', handleError);
+
+    const loadMap = () => {
+      if (!window.google) {
+        console.error("Google Maps API not yet loaded.");
+        return;
+      }
+      const google = window.google;
+      const mapElement = document.getElementById("map");
+      const mapOptions = {
+        zoom: 13,
+        center: new google.maps.LatLng(-28.258417445763822, -52.403213941449465),
+        mapTypeId: "hybrid",
+      };
+      const mapInstance = new google.maps.Map(mapElement, mapOptions);
+      setMap(mapInstance);
+
+      loadCrimeData().then(heatmapData => {
+        const heatmapInstance = new google.maps.visualization.HeatmapLayer({
+          data: heatmapData,
+          map: mapInstance,
+        });
+        setHeatmap(heatmapInstance);
+      });
+    };
+
+    window.loadMap = loadMap; // Define loadMap globalmente
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDc-Znsm41WJVPPTou32s3bEVvlHzhQTUo&libraries=visualization&callback=loadMap`;
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+    
+    return () => {
+      document.head.removeChild(script);
+      window.removeEventListener('error', handleError);
+      delete window.loadMap;
+    };
+  }, []);
+
+  const loadCrimeData = async () => {
+    const querySnapshot = await getDocs(collection(db, 'crimes'));
+    return querySnapshot.docs.map(doc => {
+      let data = doc.data();
+      return new window.google.maps.LatLng(data.lat, data.long);
+    });
+  };
+
+  const toggleHeatmap = () => {
+    heatmap && heatmap.setMap(heatmap.getMap() ? null : map);
+  };
+
+  const changeGradient = () => {
+    const gradient = [
+      // Cores do gradiente
+    ];
+    heatmap && heatmap.set('gradient', heatmap.get('gradient') ? null : gradient);
+  };
+
+  const changeRadius = () => {
+    heatmap && heatmap.set('radius', heatmap.get('radius') ? null : 100);
+  };
+
+  const changeOpacity = () => {
+    heatmap && heatmap.set('opacity', heatmap.get('opacity') ? null : 0.5);
+  };
+
+const togglePanel = () => {
+    setIsPanelVisible(!isPanelVisible);
+  };
+
+  return (
+    <div>
+      <button style={toggleButtonStyle} onClick={togglePanel}>&#9776;</button>
+      {isPanelVisible && (
+        <div id="floating-panel" style={panelStyle}>
+          <button style={buttonStyle} onClick={toggleHeatmap}>Toggle Heatmap</button>
+          <button style={buttonStyle} onClick={changeGradient}>Change Gradient</button>
+          <button style={buttonStyle} onClick={changeRadius}>Change Radius</button>
+          <button style={buttonStyle} onClick={changeOpacity}>Change Opacity</button>
+        </div>
+      )}
+      <div id="map" style={{ height: '80vh', width: '100%' }}></div>
+    </div>
+  );
+}
+
+const panelStyle = {
+  position: 'absolute',
+  top: '40px',
+  left: '10px',
+  zIndex: 5,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  padding: '10px',
+  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  borderRadius: '8px',
+  boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+};
+
+const buttonStyle = {
+  backgroundColor: '#007bff',
+  border: 'none',
+  color: 'white',
+  padding: '10px 20px',
+  textAlign: 'center',
+  textDecoration: 'none',
+  display: 'inline-block',
+  fontSize: '16px',
+  margin: '4px 2px',
+  borderRadius: '5px',
+  cursor: 'pointer',
+  transition: 'background-color 0.3s, box-shadow 0.3s',
+  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+};
+
+const toggleButtonStyle = {
+  position: 'absolute',
+  top: '10px',
+  left: '10px',
+  zIndex: 6,
+  backgroundColor: '#007bff',
+  color: 'white',
+  border: 'none',
+  width: '30px',
+  height: '30px',
+  borderRadius: '50%',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  fontSize: '20px',
+  cursor: 'pointer',
+  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+};
+
+export default HeatmapApp;
+

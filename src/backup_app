@@ -1,0 +1,205 @@
+import React, { useEffect, useState } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, getDocs } from 'firebase/firestore';
+
+/* global google */
+
+// Firebase Configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyDc-Znsm41WJVPPTou32s3bEVvlHzhQTUo",
+  authDomain: "tcc01-420505.firebaseapp.com",
+  projectId: "tcc01-420505",
+  storageBucket: "tcc01-420505.appspot.com",
+  messagingSenderId: "1086977661958",
+  appId: "1:1086977661958:web:5d99adf5ef2ff8da987787",
+  measurementId: "G-F9R0BGNMQL"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+function HeatmapApp() {
+  const [map, setMap] = useState(null);
+  const [heatmap, setHeatmap] = useState(null);
+  const [userLocationMarker, setUserLocationMarker] = useState(null);
+  const [isPanelVisible, setIsPanelVisible] = useState(false);
+  const [isHeatmapToggled, setIsHeatmapToggled] = useState(true);
+  const [isRadiusToggled, setIsRadiusToggled] = useState(true);
+  const [isOpacityToggled, setIsOpacityToggled] = useState(true);
+
+  useEffect(() => {
+    const handleError = (event) => {
+      event.preventDefault();
+      console.error('Error captured:', event.error);
+    };
+
+    window.onerror = function (message, source, lineno, colno, error) {
+      return true;
+    };
+
+    window.addEventListener('error', handleError);
+
+    const loadMapScript = () => {
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDc-Znsm41WJVPPTou32s3bEVvlHzhQTUo&libraries=visualization&callback=initMap`;
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    };
+
+    loadMapScript();
+
+    return () => {
+      document.head.querySelectorAll('script').forEach(script => {
+        if (script.src.includes("googleapis")) {
+          document.head.removeChild(script);
+        }
+      });
+      window.removeEventListener('error', handleError);
+    };
+  }, []);
+
+  window.initMap = () => {
+    const mapElement = document.getElementById("map");
+    const mapOptions = {
+      zoom: 13,
+      center: new google.maps.LatLng(-28.258417445763822, -52.403213941449465),
+      mapTypeId: "hybrid",
+    };
+    const mapInstance = new google.maps.Map(mapElement, mapOptions);
+    setMap(mapInstance);
+
+    loadCrimeData().then(heatmapData => {
+      const heatmapInstance = new google.maps.visualization.HeatmapLayer({
+        data: heatmapData,
+        map: mapInstance,
+      });
+      heatmapInstance.set('radius', 100);
+      setHeatmap(heatmapInstance);
+    });
+  };
+
+  const loadCrimeData = async () => {
+    const querySnapshot = await getDocs(collection(db, 'crimes'));
+    return querySnapshot.docs.map(doc => {
+      let data = doc.data();
+      return new window.google.maps.LatLng(data.lat, data.long);
+    });
+  };
+
+  const handleLocationAccess = () => {
+    if (map && "geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(function(position) {
+        const userLoc = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+        const marker = new google.maps.Marker({
+          position: userLoc,
+          map: map,
+          title: "You are here"
+        });
+        setUserLocationMarker(marker);
+        map.setCenter(userLoc);
+      }, function(error) {
+        console.error("Error getting location: ", error);
+        alert("Error getting location: " + error.message);
+      }, {
+        maximumAge: 10000,
+        timeout: 5000,
+        enableHighAccuracy: true
+      });
+    } else {
+      alert("Geolocation is not supported by this browser.");
+    }
+  };
+
+  const toggleHeatmap = () => {
+    setIsHeatmapToggled(!isHeatmapToggled);
+    heatmap && heatmap.setMap(isHeatmapToggled ? null : map);
+  };
+
+  const toggleRadius = () => {
+    setIsRadiusToggled(!isRadiusToggled);
+    heatmap && heatmap.set('radius', isRadiusToggled ? null : 100);
+  };
+
+  const toggleOpacity = () => {
+    setIsOpacityToggled(!isOpacityToggled);
+    heatmap && heatmap.set('opacity', isOpacityToggled ? null : 0.5);
+  };
+
+  const togglePanel = () => {
+    setIsPanelVisible(!isPanelVisible);
+  };
+
+  const panelStyle = {
+    position: 'absolute',
+    top: '40px',
+    left: '10px',
+    zIndex: 5,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    padding: '10px',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: '8px',
+    boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+  };
+
+  const buttonStyle = {
+    backgroundColor: '#007bff',
+    border: 'none',
+    color: 'white',
+    padding: '10px 20px',
+    textAlign: 'center',
+    textDecoration: 'none',
+    display: 'inline-block',
+    fontSize: '16px',
+    margin: '4px 2px',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    transition: 'background-color 0.3s, box-shadow 0.3s',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+  };
+
+  const toggledButtonStyle = {
+    ...buttonStyle,
+    backgroundColor: 'green'
+  };
+
+  const toggleButtonStyle = {
+    position: 'absolute',
+    top: '10px',
+    left: '10px',
+    zIndex: 6,
+    backgroundColor: '#007bff',
+    color: 'white',
+    border: 'none',
+    width: '30px',
+    height: '30px',
+    borderRadius: '50%',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    fontSize: '20px',
+    cursor: 'pointer',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+  };
+
+  return (
+    <div>
+      <button style={toggleButtonStyle} onClick={togglePanel}>&#9776;</button>
+      {isPanelVisible && (
+        <div id="floating-panel" style={panelStyle}>
+          <button style={isHeatmapToggled ? toggledButtonStyle : buttonStyle} onClick={toggleHeatmap}>Heatmap on/off</button>
+          <button style={isRadiusToggled ? toggledButtonStyle : buttonStyle} onClick={toggleRadius}>Change Radius</button>
+          <button style={isOpacityToggled ? toggledButtonStyle : buttonStyle} onClick={toggleOpacity}>Change Opacity</button>
+          <button style={buttonStyle} onClick={handleLocationAccess}>Enable Location</button>
+        </div>
+      )}
+      <div id="map" style={{ height: '80vh', width: '100%' }}></div>
+    </div>
+  );
+}
+
+export default HeatmapApp;
+
